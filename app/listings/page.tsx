@@ -1,163 +1,184 @@
-// app/listings/page.tsx
-'use client';
-import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/server';
 import Navbar from '@/components/layout/Navbar';
-import { Bed, Bath, Ruler, Clock, TrendingDown, MapPin, Search, SlidersHorizontal } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import type { Listing } from '@/types';
+import { notFound } from 'next/navigation';
+import {
+  Bed, Bath, Ruler, Clock, Shield, MapPin, AlertTriangle,
+  Star, TrendingDown, CheckCircle, Calendar
+} from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
+import { getStateDisclosure } from '@/lib/state-disclosures';
 
-export default function ListingsPage() {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stateFilter, setStateFilter] = useState('');
-  const [search, setSearch] = useState('');
+export default async function ListingDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (stateFilter) params.set('state', stateFilter);
-        const res = await fetch(`/api/listings?${params}`);
-        const data = await res.json();
-        setListings(data.listings || []);
-      } catch {
-        console.error('Failed to load listings');
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [stateFilter]);
+  const { data: listing } = await supabase
+    .from('listings')
+    .select(`
+      *,
+      profile:profiles(id, full_name, avg_rating, total_sales),
+      bids(
+        id, bid_type, commission_pct, commission_usd, status, created_at,
+        profile:profiles(id, full_name, avg_rating, total_sales, brokerage, license_state, bio)
+      )
+    `)
+    .eq('id', id)
+    .single();
 
-  const filtered = listings.filter(l =>
-    !search ||
-    l.address.toLowerCase().includes(search.toLowerCase()) ||
-    l.city.toLowerCase().includes(search.toLowerCase())
-  );
+  if (!listing) notFound();
+
+  const isOwner = user?.id === listing.owner_id;
+  const disclosure = getStateDisclosure(listing.state);
+  const pendingBids = (listing.bids || [])
+    .filter((b: any) => b.status === 'pending')
+    .sort((a: any, b: any) => a.commission_usd - b.commission_usd);
+
+  const standardSavings3 = Math.round(listing.reference_price * 0.03);
+  const lowestBidUsd = pendingBids[0]?.commission_usd || 0;
+  const potentialSavings = lowestBidUsd > 0 ? standardSavings3 - lowestBidUsd : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Open listings</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Homeowners waiting for realtor bids
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                className="input pl-8 w-48"
-                placeholder="Search city or address…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                listing.status === 'active' ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {listing.status === 'active' ? '● Accepting bids' : listing.status}
+              </span>
             </div>
-            <select
-              className="input w-36"
-              value={stateFilter}
-              onChange={e => setStateFilter(e.target.value)}
-            >
-              <option value="">All states</option>
-              {['CA','CO','FL','GA','IL','NY','NC','OH','TX','WA'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <h1 className="text-2xl font-semibold text-gray-900">{listing.address}</h1>
+            <div className="text-gray-500 flex items-center gap-1 mt-1">
+              <MapPin size={14} />
+              {listing.city}, {listing.state} {listing.zip}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-3xl font-bold text-brand-600">
+              ${listing.reference_price.toLocaleString()}
+            </div>
+            <div className="text-sm text-gray-400 mt-0.5">Reference price</div>
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="card animate-pulse">
-                <div className="h-32 bg-gray-100 rounded-lg mb-4" />
-                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-1/2" />
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-5">
+            <div className="card">
+              <h3 className="mb-4">Property details</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {listing.bedrooms && (
+                  <div className="stat-card text-center items-center">
+                    <Bed size={18} className="text-brand-400" />
+                    <div className="text-lg font-bold">{listing.bedrooms}</div>
+                    <div className="text-xs text-gray-500">Bedrooms</div>
+                  </div>
+                )}
+                {listing.bathrooms && (
+                  <div className="stat-card text-center items-center">
+                    <Bath size={18} className="text-brand-400" />
+                    <div className="text-lg font-bold">{listing.bathrooms}</div>
+                    <div className="text-xs text-gray-500">Bathrooms</div>
+                  </div>
+                )}
+                {listing.sqft && (
+                  <div className="stat-card text-center items-center">
+                    <Ruler size={18} className="text-brand-400" />
+                    <div className="text-lg font-bold">{listing.sqft.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Sq ft</div>
+                  </div>
+                )}
+                {listing.year_built && (
+                  <div className="stat-card text-center items-center">
+                    <Calendar size={18} className="text-brand-400" />
+                    <div className="text-lg font-bold">{listing.year_built}</div>
+                    <div className="text-xs text-gray-500">Year built</div>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <MapPin size={32} className="mx-auto mb-3 opacity-30" />
-            <p>No active listings found</p>
-            <p className="text-sm mt-1">Check back soon or adjust your filters</p>
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map(listing => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+              {listing.description && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                    From the homeowner
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{listing.description}</p>
+                </div>
+              )}
+            </div>
 
-function ListingCard({ listing }: { listing: Listing }) {
-  const daysLeft = formatDistanceToNow(new Date(listing.bid_deadline), { addSuffix: true });
-  const isUrgent = new Date(listing.bid_deadline).getTime() - Date.now() < 48 * 3600 * 1000;
+            {disclosure?.restriction_type === 'attorney_state' && (
+              <div className="disclosure-banner">
+                <AlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-medium text-amber-800 text-sm mb-1">Attorney closing state</div>
+                  <p className="text-xs text-amber-700">{disclosure.notes}</p>
+                </div>
+              </div>
+            )}
 
-  return (
-    <div className="card hover:shadow-md transition-shadow cursor-pointer group">
-      {/* Property image placeholder */}
-      <div className="h-36 bg-gradient-to-br from-brand-50 to-brand-100 rounded-lg mb-4 flex items-center justify-center relative overflow-hidden">
-        <span className="text-brand-400 text-5xl opacity-30">⌂</span>
-        <div className="absolute top-2 left-2">
-          <span className="badge-green text-xs">Accepting bids</span>
-        </div>
-        {isUrgent && (
-          <div className="absolute top-2 right-2">
-            <span className="badge-red text-xs">Closes soon</span>
-          </div>
-        )}
-      </div>
-
-      <div className="mb-1 font-medium text-gray-900 text-sm">{listing.address}</div>
-      <div className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-        <MapPin size={11} />
-        {listing.city}, {listing.state} {listing.zip}
-      </div>
-
-      <div className="text-xl font-bold text-brand-600 mb-2">
-        ${listing.reference_price.toLocaleString()}
-        <span className="text-xs font-normal text-gray-400 ml-1">ref. price</span>
-      </div>
-
-      <div className="flex gap-3 text-xs text-gray-500 mb-4">
-        {listing.bedrooms && <span className="flex items-center gap-1"><Bed size={12} />{listing.bedrooms} bed</span>}
-        {listing.bathrooms && <span className="flex items-center gap-1"><Bath size={12} />{listing.bathrooms} bath</span>}
-        {listing.sqft && <span className="flex items-center gap-1"><Ruler size={12} />{listing.sqft.toLocaleString()} sqft</span>}
-      </div>
-
-      <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
-        <div className="text-xs text-gray-500 flex items-center gap-1">
-          <Clock size={11} />
-          Closes {daysLeft}
-        </div>
-        <div className="flex items-center gap-1">
-          <TrendingDown size={11} className="text-brand-400" />
-          <span className="text-xs font-medium text-brand-600">
-            {listing.bid_count || 0} bids
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-3 text-xs bg-brand-50 text-brand-700 rounded-lg px-3 py-2">
-        Min commission: ${listing.min_commission_usd.toLocaleString()} ({listing.min_commission_pct}%)
-      </div>
-
-      <a
-        href={`/listings/${listing.id}`}
-        className="btn-primary w-full justify-center mt-3 text-sm"
-      >
-        View & bid on this listing
-      </a>
-    </div>
-  );
-}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h3>{pendingBids.length} bid{pendingBids.length !== 1 ? 's' : ''} received</h3>
+                {potentialSavings > 0 && (
+                  <span className="badge-green">
+                    <TrendingDown size={11} />
+                    Save up to ${potentialSavings.toLocaleString()} vs 3%
+                  </span>
+                )}
+              </div>
+              {pendingBids.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No bids yet — be the first realtor to bid on this listing.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingBids.map((bid: any, i: number) => {
+                    const initials = bid.profile?.full_name
+                      ?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || '??';
+                    return (
+                      <div key={bid.id} className={`p-4 rounded-xl ${
+                        i === 0 ? 'bg-brand-50 border border-brand-100' : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                              i === 0 ? 'bg-brand-400 text-white' : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {initials}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{bid.profile?.full_name}</span>
+                                {i === 0 && <span className="badge-green text-xs">Lowest bid</span>}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                {bid.profile?.brokerage && <span>{bid.profile.brokerage}</span>}
+                                {bid.profile?.license_state && <span>License: {bid.profile.license_state}</span>}
+                                {bid.profile?.avg_rating > 0 && (
+                                  <span className="flex items-center gap-0.5">
+                                    <Star size={10} className="text-amber-400" />
+                                    {bid.profile.avg_rating.toFixed(1)}
+                                  </span>
+                                )}
+                                {bid.profile?.total_sales > 0 && (
+                                  <span>{bid.profile.total_sales} sales</span>
+                                )}
+                              </div>
+                              {bid.cover_letter && (
+                                <p className="text-xs text-gray-600 mt-2 leading-relaxed">{bid.cover_letter}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className={`text-xl font-bold ${i === 0 ? 'text-brand-600' : 'text-gray-800'}`}>
+                              {bid.commission_pct ? `${bid.commission_pct}%` : `$${bid.commission_usd.toLocaleString()}`}
+                            </div>
+                            <div className="text-xs text-gray-400">= ${bid.commission_usd.toLocaleString()}</div>
+                            {isOwner &&
