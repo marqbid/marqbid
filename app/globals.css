@@ -1,0 +1,81 @@
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #1D9E75;
+  --brand-dark: #0F6E56;
+  --brand-light: #E1F5EE;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+  }
+
+  h1 { @apply text-3xl font-semibold tracking-tight; }
+  h2 { @apply text-2xl font-semibold tracking-tight; }
+  h3 { @apply text-lg font-medium; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-400 text-white font-medium text-sm
+      hover:bg-brand-600 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700
+      font-medium text-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 text-sm
+      hover:bg-gray-100 transition-colors;
+  }
+
+  .card {
+    @apply bg-white border border-gray-100 rounded-xl p-5 shadow-sm;
+  }
+
+  .input {
+    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900
+      focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+      placeholder:text-gray-400 bg-white;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide;
+  }
+
+  .badge-green {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-brand-50 text-brand-600 text-xs font-medium;
+  }
+
+  .badge-amber {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-xs font-medium;
+  }
+
+  .badge-red {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-xs font-medium;
+  }
+
+  .badge-gray {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-xs font-medium;
+  }
+
+  .stat-card {
+    @apply bg-gray-50 rounded-xl p-4 flex flex-col gap-1;
+  }
+
+  .disclosure-banner {
+    @apply flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm;
+  }
+
+  .section {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 py-8;
+  }
+}
