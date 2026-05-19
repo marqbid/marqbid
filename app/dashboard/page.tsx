@@ -156,7 +156,7 @@ function ListingWithBids({ listing }: { listing: any }) {
               </span>
             )}
           </div>
-          {pendingBids.slice(0, 5).map((bid, i) => (
+          {pendingBids.slice(0, 5).map((bid: any, i: number) => (
             <BidRow key={bid.id} bid={bid} isBest={i === 0} listingId={listing.id} isActive={isActive} />
           ))}
           {pendingBids.length > 5 && (
