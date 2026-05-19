@@ -101,7 +101,7 @@ export default async function DashboardPage() {
   );
 }
 
-function ListingWithBids({ listing }: { listing: Listing & { bids: (Bid & { profile: any })[] } }) {
+function ListingWithBids({ listing }: { listing: any }) {
   const bids = listing.bids || [];
   const pendingBids = bids.filter(b => b.status === 'pending')
     .sort((a, b) => a.commission_usd - b.commission_usd);
@@ -173,7 +173,7 @@ function ListingWithBids({ listing }: { listing: Listing & { bids: (Bid & { prof
 function BidRow({
   bid, isBest, listingId, isActive
 }: {
-  bid: Bid & { profile: any };
+  bid: any;
   isBest: boolean;
   listingId: string;
   isActive: boolean;
