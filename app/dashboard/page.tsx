@@ -103,8 +103,8 @@ export default async function DashboardPage() {
 
 function ListingWithBids({ listing }: { listing: any }) {
   const bids = listing.bids || [];
-  const pendingBids = bids.filter(b => b.status === 'pending')
-    .sort((a, b) => a.commission_usd - b.commission_usd);
+  const pendingBids = bids.filter((b: any) => b.status === 'pending')
+    .sort((a: any, b: any) => a.commission_usd - b.commission_usd);
 
   const isActive = listing.status === 'active';
   const isClosed = listing.status === 'closed';
