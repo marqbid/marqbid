@@ -47,9 +47,16 @@ function AuthForm() {
         if (error) throw error;
         setSuccess('Check your email to confirm your account, then sign in.');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        router.push(role === 'realtor' ? '/realtor' : '/dashboard');
+       const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+if (error) throw error;
+// Look up actual role from database
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('id', data.user.id)
+  .single();
+const actualRole = profile?.role || 'homeowner';
+router.push(actualRole === 'realtor' ? '/realtor' : '/dashboard');
       }
     } catch (e: any) {
       setError(e.message || 'Something went wrong.');
