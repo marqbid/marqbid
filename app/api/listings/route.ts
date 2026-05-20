@@ -97,3 +97,26 @@ export async function POST(req: NextRequest) {
     .from('listings')
     .insert({
       owner_id: user.id,
+      address, city,
+      state: state.toUpperCase(),
+      zip,
+      bedrooms, bathrooms, sqft, year_built,
+      description,
+      asking_price,
+      zestimate,
+      reference_price: referencePrice,
+      min_commission_pct: effectiveMinPct,
+      min_commission_usd: minCommission.usd,
+      bid_deadline: bidDeadline.toISOString(),
+      listing_fee_cents: parseInt(process.env.NEXT_PUBLIC_LISTING_FEE_CENTS || '999'),
+      status: 'draft',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ listing }, { status: 201 });
+}
