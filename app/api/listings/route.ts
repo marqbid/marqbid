@@ -8,7 +8,6 @@ import { calculateMinCommission } from '@/lib/property-lookup';
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { searchParams } = new URL(req.url);
-
   const state = searchParams.get('state');
   const minBeds = searchParams.get('min_beds');
   const maxPrice = searchParams.get('max_price');
@@ -20,8 +19,7 @@ export async function GET(req: NextRequest) {
     .select(`
       *,
       profile:profiles(id, full_name, avg_rating),
-      bid_count:bids(count),
-      lowest_bid:bids(commission_usd)
+      bids(id, commission_usd, status)
     `)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -37,14 +35,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ listings: data, total: count, page });
+  const processedListings = (data || []).map(listing => ({
+    ...listing,
+    bid_count: listing.bids?.length || 0,
+    lowest_bid_usd: listing.bids?.length > 0
+      ? Math.min(...listing.bids.map((b: any) => b.commission_usd))
+      : null,
+  }));
+
+  return NextResponse.json({ listings: processedListings, total: count, page });
 }
 
 // POST /api/listings — create new listing
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
-  // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -59,7 +64,6 @@ export async function POST(req: NextRequest) {
     min_commission_pct,
   } = body;
 
-  // Validate state
   if (!isStateAllowed(state?.toUpperCase())) {
     return NextResponse.json(
       { error: `Listings from ${state} are currently not accepted` },
@@ -67,7 +71,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Calculate reference price and min commission
   const referencePrice = Math.max(
     asking_price || 0,
     zestimate || 0
@@ -94,26 +97,3 @@ export async function POST(req: NextRequest) {
     .from('listings')
     .insert({
       owner_id: user.id,
-      address, city,
-      state: state.toUpperCase(),
-      zip,
-      bedrooms, bathrooms, sqft, year_built,
-      description,
-      asking_price,
-      zestimate,
-      reference_price: referencePrice,
-      min_commission_pct: effectiveMinPct,
-      min_commission_usd: minCommission.usd,
-      bid_deadline: bidDeadline.toISOString(),
-      listing_fee_cents: parseInt(process.env.NEXT_PUBLIC_LISTING_FEE_CENTS || '999'),
-      status: 'draft', // activated after payment
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ listing }, { status: 201 });
-}
